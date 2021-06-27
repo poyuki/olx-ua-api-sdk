@@ -2,73 +2,64 @@
 
 namespace Parhomenko\Olx\Api;
 
+use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\RequestOptions;
+use function json_decode;
 
-class Regions
+/**
+ * Class Regions
+ *
+ * @package Parhomenko\Olx\Api
+ */
+class Regions extends BaseResource
 {
-    const API_VERSION = '2.0';
-    const OLX_REGIONS_URL = '/api/partner/regions';
-
-    private $user;
-    private $guzzleClient;
-
-    public function __construct( User $user, Client $guzzleClient )
-    {
-        $this->user = $user;
-        $this->guzzleClient = $guzzleClient;
-    }
+    private const OLX_REGIONS_URL = '/api/partner/regions';
 
     /**
      * @return array
-     * @throws \Exception
+     * @throws GuzzleException
      */
-    public function getAll() : array
+    public function getAll(): array
     {
-        try {
-            $response = $this->guzzleClient->request('GET', self::OLX_REGIONS_URL, [
-                'headers' => [
-                    'Authorization' => $this->user->getTokenType() .' ' .$this->user->getAccessToken(),
+        $response = $this->guzzleClient->request('GET', self::OLX_REGIONS_URL, [
+            RequestOptions::HEADERS => [
+                'Authorization' => $this->user->getTokenType() . ' ' . $this->user->getAccessToken(),
+                'Version' => self::API_VERSION
+            ]
+        ]);
+
+        $regions = json_decode($response->getBody()->getContents(), true);
+
+        if (!isset($regions['data'])) {
+            throw new Exception('Got empty response | Get all OLX regions');
+        }
+
+        return $regions['data'];
+    }
+
+    /**
+     * @param int $regionId
+     * @return array
+     * @throws GuzzleException
+     */
+    public function get(int $regionId): array
+    {
+        $response = $this->guzzleClient
+            ->request('GET', self::OLX_REGIONS_URL . '/' . $regionId, [
+                RequestOptions::HEADERS => [
+                    'Authorization' => $this->user->getTokenType() . ' ' . $this->user->getAccessToken(),
                     'Version' => self::API_VERSION
                 ]
             ]);
 
-            $regions = json_decode($response->getBody()->getContents(), true);
+        $data = json_decode($response->getBody()->getContents(), true);
 
-            if( !isset( $regions['data'] ) )
-                throw new \Exception( 'Got empty response | Get all OLX regions' );
-
-            return $regions['data'];
-
-        } catch ( \Exception $e ){
-            throw $e;
+        if (!isset($data['data'])) {
+            throw new Exception('Got empty response | Get all OLX regions');
         }
-    }
 
-    /**
-     * @param int $region_id
-     * @return array
-     * @throws \Exception
-     */
-    public function get( int $region_id ) : array
-    {
-        try {
-            $response = $this->guzzleClient->request('GET', self::OLX_REGIONS_URL .'/' .$region_id, [
-                'headers' => [
-                    'Authorization' => $this->user->getTokenType() .' ' .$this->user->getAccessToken(),
-                    'Version' => self::API_VERSION
-                ]
-            ]);
-
-            $data = json_decode($response->getBody()->getContents(), true);
-
-            if( !isset( $data['data'] ) ){
-                throw new \Exception( 'Got empty response | Get all OLX regions' );
-            }
-
-            return $data['data'];
-
-        } catch ( \Exception $e ){
-            throw $e;
-        }
+        return $data['data'];
     }
 }

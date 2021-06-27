@@ -1,16 +1,43 @@
 <?php
+
 namespace Parhomenko\Olx\Exceptions;
 
 
+use Exception;
 use Throwable;
 
-abstract class BaseOlxException extends \Exception
+/**
+ * Class BaseOlxException
+ *
+ * @package Parhomenko\Olx\Exceptions
+ */
+abstract class BaseOlxException extends Exception
 {
+    /**
+     * @var string|null
+     */
     protected $detail;
+    /**
+     * @var string|null
+     */
     protected $title;
 
-    public function __construct($message = "", $code = 0, Throwable $previous = null, string $title = null, string $detail = null )
-    {
+    /**
+     * BaseOlxException constructor.
+     *
+     * @param string $message
+     * @param int $code
+     * @param Throwable|null $previous
+     * @param string|null $title
+     * @param string|null $detail
+     */
+    public function __construct(
+        $message = "",
+        $code = 0,
+        Throwable $previous = null,
+        string $title = null,
+        string $detail = null
+    ) {
         parent::__construct($message, $code, $previous);
 
         $this->title = $title;
@@ -20,7 +47,7 @@ abstract class BaseOlxException extends \Exception
     /**
      * @return string|null
      */
-    public function getDetail()
+    public function getDetail(): ?string
     {
         return $this->detail;
     }
@@ -28,7 +55,7 @@ abstract class BaseOlxException extends \Exception
     /**
      * @return string|null
      */
-    public function getTitle()
+    public function getTitle(): ?string
     {
         return $this->title;
     }

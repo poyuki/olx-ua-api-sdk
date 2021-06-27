@@ -2,50 +2,40 @@
 
 namespace Parhomenko\Olx\Api;
 
+use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\RequestOptions;
+use function json_decode;
 
-class Languages
+/**
+ * Class Languages
+ *
+ * @package Parhomenko\Olx\Api
+ */
+class Languages extends BaseResource
 {
-    const API_VERSION = '2.0';
-    const OLX_LANGUAGES_URL = '/api/partner/languages';
-
-    private $user;
-    private $guzzleClient;
-
-    /**
-     * Languages constructor.
-     * @param User $user
-     * @param Client $guzzleClient
-     */
-    public function __construct( User $user, Client $guzzleClient )
-    {
-        $this->user = $user;
-        $this->guzzleClient = $guzzleClient;
-    }
+    private const OLX_LANGUAGES_URL = '/api/partner/languages';
 
     /**
      * @return array
-     * @throws \Exception
+     * @throws GuzzleException
      */
-    public function getAll() : array
+    public function getAll(): array
     {
-        try {
-            $response = $this->guzzleClient->request('GET', self::OLX_LANGUAGES_URL, [
-                'headers' => [
-                    'Authorization' => $this->user->getTokenType() .' ' .$this->user->getAccessToken(),
-                    'Version' => self::API_VERSION
-                ]
-            ]);
+        $response = $this->guzzleClient->request('GET', self::OLX_LANGUAGES_URL, [
+            RequestOptions::HEADERS => [
+                'Authorization' => $this->user->getTokenType() . ' ' . $this->user->getAccessToken(),
+                'Version' => self::API_VERSION
+            ]
+        ]);
 
-            $data = json_decode($response->getBody()->getContents(), true);
+        $data = json_decode($response->getBody()->getContents(), true);
 
-            if( !isset( $data['data'] ) )
-                throw new \Exception( 'Got empty response | Get all OLX regions' );
-
-            return $data['data'];
-
-        } catch ( \Exception $e ){
-            throw $e;
+        if (!isset($data['data'])) {
+            throw new Exception('Got empty response | Get all OLX regions');
         }
+
+        return $data['data'];
     }
 }

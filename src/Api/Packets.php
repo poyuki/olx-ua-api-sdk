@@ -2,7 +2,7 @@
 
 namespace Parhomenko\Olx\Api;
 
-class Packets
+class Packets extends BaseResource
 {
 
 }

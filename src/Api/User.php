@@ -2,40 +2,99 @@
 
 namespace Parhomenko\Olx\Api;
 
+use DateInterval;
+use DateTime;
+use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Psr7\Query;
+use GuzzleHttp\RequestOptions;
 use Parhomenko\Olx\Exceptions\BadRequestException;
 use Parhomenko\Olx\Exceptions\CallLimitException;
 use Parhomenko\Olx\Exceptions\ExceptionFactory;
+use Parhomenko\Olx\Exceptions\ForbiddenException;
+use Parhomenko\Olx\Exceptions\NotAcceptableException;
+use Parhomenko\Olx\Exceptions\NotFoundException;
 use Parhomenko\Olx\Exceptions\RefreshTokenException;
+use Parhomenko\Olx\Exceptions\ServerException;
+use Parhomenko\Olx\Exceptions\UnauthorizedException;
+use Parhomenko\Olx\Exceptions\UnsupportedMediaTypeException;
+use Parhomenko\Olx\Exceptions\ValidationException;
 use function GuzzleHttp\Psr7\build_query;
+use function json_decode;
 
+/**
+ * Class User
+ *
+ * @package Parhomenko\Olx\Api
+ */
 class User
 {
-    const OLX_AUTH_REQUEST_URI = '/api/open/oauth/token';
-    const OLX_AUTH_DEFAULT_GRAND_TYPE = 'authorization_code';
-    const OLX_AUTH_DEFAULT_SCOPE = 'read write v2';
-    const OLX_AUTH_DEFAULT_TOKEN_TYPE = 'bearer';
+    private const OLX_AUTH_REQUEST_URI = '/api/open/oauth/token';
+    private const OLX_AUTH_DEFAULT_GRAND_TYPE = 'authorization_code';
+    private const OLX_AUTH_DEFAULT_SCOPE = 'read write v2';
+    private const OLX_AUTH_DEFAULT_TOKEN_TYPE = 'bearer';
 
+    /**
+     * @var Client
+     */
     private $guzzleClient;
+    /**
+     * @var int
+     */
     private $client_id;
+    /**
+     * @var string
+     */
     private $client_secret;
+    /**
+     * @var string|null
+     */
     private $access_token;
+    /**
+     * @var string|null
+     */
     private $refresh_token;
+    /**
+     * @var string
+     */
     private $token_type;
+    /**
+     * @var int
+     */
     private $token_expires_in;
+    /**
+     * @var string
+     */
     private $token_updated_at;
+    /**
+     * @var string
+     */
     private $grant_type;
+    /**
+     * @var string
+     */
     private $scope;
 
-    private $required_credentials = [
+    /**
+     * @var string[]
+     */
+    private $requiredCredentials = [
         'client_id',
         'client_secret'
     ];
 
-    public function __construct( Client $guzzleClient, $credentials )
+    /**
+     * User constructor.
+     *
+     * @param Client $guzzleClient
+     * @param $credentials
+     * @throws Exception
+     */
+    public function __construct(Client $guzzleClient, $credentials)
     {
-        $this->validateCredentials( $credentials );
+        $this->validateCredentials($credentials);
 
         $this->guzzleClient = $guzzleClient;
 
@@ -53,80 +112,79 @@ class User
     /**
      * @return integer
      */
-    public function getClientId(){
+    public function getClientId(): int
+    {
         return $this->client_id;
     }
 
     /**
      * @return string
      */
-    public function getClientSecret(){
+    public function getClientSecret(): string
+    {
         return $this->client_secret;
     }
 
     /**
      * @return string
      */
-    public function getTokenType(){
+    public function getTokenType(): string
+    {
         return $this->token_type;
     }
 
-    /**
-     * @return string
-     */
-    public function getAccessToken(){
+    public function getAccessToken(): ?string
+    {
         return $this->access_token;
     }
 
-    /**
-     * @return string
-     */
-    public function getRefreshToken(){
+    public function getRefreshToken(): ?string
+    {
         return $this->refresh_token;
     }
 
     /**
-     * @return string
+     * @return int
      */
-    public function getTokenExpiresIn(){
+    public function getTokenExpiresIn(): int
+    {
         return $this->token_expires_in;
     }
 
     /**
      * @param array $credentials
-     * @return bool
-     * @throws \Exception
+     * @return void
+     * @throws Exception
      */
-    private function validateCredentials( array $credentials )
+    private function validateCredentials(array $credentials): void
     {
         $missing_credentials = [];
 
-        foreach ($this->required_credentials as $required_credential )
-        {
-            if( !key_exists( $required_credential, $credentials ) ) $missing_credentials[] = $required_credential;
+        foreach ($this->requiredCredentials as $required_credential) {
+            if (!array_key_exists($required_credential, $credentials)) {
+                $missing_credentials[] = $required_credential;
+            }
         }
 
-        if( !empty($missing_credentials) ) throw new \Exception('Missing credentials: ' .implode(', ',$missing_credentials ) );
-
-        return true;
+        if (!empty($missing_credentials)) {
+            throw new Exception('Missing credentials: ' . implode(', ', $missing_credentials));
+        }
     }
 
     /**
      * Check if token is invalid or unexpected
      */
-    public function checkToken() : self
+    public function checkToken(): self
     {
 
-        if( !$this->access_token )
-        {
+        if (!$this->access_token) {
             $this->refreshToken();
-        }else{
+        } else {
 
-            $date_time_expires = new \DateTime( $this->token_updated_at );
-            $date_time_expires->add( new \DateInterval( 'PT' .$this->token_expires_in .'S' ) );
+            $date_time_expires = new DateTime($this->token_updated_at);
+            $date_time_expires->add(new DateInterval('PT' . $this->token_expires_in . 'S'));
 
-            if( $date_time_expires <= new \DateTime() )
-            {
+            if ($date_time_expires <= new DateTime()) {
                 $this->refreshToken();
             }
 
@@ -137,61 +195,68 @@ class User
 
     /**
      * Step 1. Get OAuth link
-     * @param string $redirect_uri
-     * @param string $state
+     *
+     * @param string|null $redirect_uri
+     * @param string|null $state
      * @return string
      */
-    public function getOAuthLink( string $redirect_uri = null, string $state = null ) : string
+    public function getOAuthLink(string $redirect_uri = null, string $state = null): string
     {
         $params = [
-            'client_id' =>$this->client_id,
+            'client_id' => $this->client_id,
             'response_type' => 'code',
             'scope' => self::OLX_AUTH_DEFAULT_SCOPE,
         ];
 
-        if( !is_null($redirect_uri) ) $params['redirect_uri'] = $redirect_uri;
-        if( !is_null($state) ) $params['state'] = $state;
-
-        return $this->guzzleClient->getConfig( 'base_uri') .'oauth/authorize/?' .build_query( $params );
+        if ($redirect_uri !== null) {
+            $params['redirect_uri'] = $redirect_uri;
+        }
+        if ($state !== null) {
+            $params['state'] = $state;
+        }
+        return $this->guzzleClient->getConfig('base_uri') . 'oauth/authorize/?' . Query::build($params);
     }
 
     /**
      * Step2. Get access token via code
-     * @param string $code
+     *
+     * @param string|null $code
      * @param null $redirect_uri
      * @return User
-     * @throws \Exception
+     * @throws GuzzleException
      */
-    public function authorize( string $code = null, $redirect_uri = null ) : self
+    public function authorize(string $code = null, $redirect_uri = null): self
     {
-        try{
+        $request_data = [
+            'client_id' => $this->client_id,
+            'client_secret' => $this->client_secret,
+            'grant_type' => $this->grant_type,
+            'scope' => $this->scope
+        ];
 
-            $request_data = [
-                'client_id' => $this->client_id,
-                'client_secret' => $this->client_secret,
-                'grant_type' => $this->grant_type,
-                'scope' => $this->scope
-            ];
-
-            if( !is_null($code) ) $request_data['code'] = $code;
-            if( !is_null($redirect_uri) ) $request_data['redirect_uri'] = $redirect_uri;
-
-            $response = $this->guzzleClient->request('POST', self::OLX_AUTH_REQUEST_URI, [ 'json' => $request_data ] );
-
-            $data = json_decode( $response->getBody()->getContents(), true );
-
-            if( !empty($data['access_token']) ){
-                $this->access_token = $data['access_token'];
-                $this->token_type = $data['token_type'];
-                if( !empty($data['refresh_token']) ) $this->refresh_token = $data['refresh_token'];
-                $this->token_expires_in = $data['expires_in'];
-                $this->token_updated_at = date( "Y-m-d H:i:s");
-            }else{
-                throw new \Exception( 'Can not get access token' );
-            }
+        if ($code !== null) {
+            $request_data['code'] = $code;
         }
-        catch (\Exception $e) {
-            throw $e;
+        if ($redirect_uri !== null) {
+            $request_data['redirect_uri'] = $redirect_uri;
+        }
+
+        $response = $this->guzzleClient->request('POST', self::OLX_AUTH_REQUEST_URI, [
+            RequestOptions::JSON => $request_data
+        ]);
+
+        $data = json_decode($response->getBody()->getContents(), true);
+
+        if (!empty($data['access_token'])) {
+            $this->access_token = $data['access_token'];
+            $this->token_type = $data['token_type'];
+            if (!empty($data['refresh_token'])) {
+                $this->refresh_token = $data['refresh_token'];
+            }
+            $this->token_expires_in = $data['expires_in'];
+            $this->token_updated_at = date("Y-m-d H:i:s");
+        } else {
+            throw new Exception('Can not get access token');
         }
 
         return $this;
@@ -199,22 +264,16 @@ class User
 
     /**
      * @return $this
-     * @throws CallLimitException
+     * @throws BadRequestException
+     * @throws GuzzleException
      * @throws RefreshTokenException
-     * @throws \GuzzleHttp\Exception\GuzzleException
-     * @throws \Parhomenko\Olx\Exceptions\BadRequestException
-     * @throws \Parhomenko\Olx\Exceptions\ForbiddenException
-     * @throws \Parhomenko\Olx\Exceptions\NotAcceptableException
-     * @throws \Parhomenko\Olx\Exceptions\NotFoundException
-     * @throws \Parhomenko\Olx\Exceptions\ServerException
-     * @throws \Parhomenko\Olx\Exceptions\UnauthorizedException
-     * @throws \Parhomenko\Olx\Exceptions\UnsupportedMediaTypeException
+     * @throws \Throwable
      */
-    public function refreshToken() : self
+    public function refreshToken(): self
     {
         try {
 
-            $response = $this->guzzleClient->request('POST', self::OLX_AUTH_REQUEST_URI, [ 'json' => [
+            $response = $this->guzzleClient->request('POST', self::OLX_AUTH_REQUEST_URI, ['json' => [
                 'client_id' => $this->client_id,
                 'client_secret' => $this->client_secret,
                 'grant_type' => "refresh_token",
@@ -222,31 +281,34 @@ class User
             ]
             ]);
 
-            $data = json_decode( $response->getBody()->getContents(), true );
+            $data = json_decode($response->getBody()->getContents(), true);
 
-            if( !empty($data['access_token']) ){
+            if (!empty($data['access_token'])) {
                 $this->access_token = $data['access_token'];
                 $this->token_type = $data['token_type'];
                 $this->refresh_token = $data['refresh_token'];
                 $this->token_expires_in = $data['expires_in'];
-                $this->token_updated_at = date( "Y-m-d H:i:s");
-            }else{
-                throw new BadRequestException( 'Can not refresh access token' );
+                $this->token_updated_at = date("Y-m-d H:i:s");
+            } else {
+                throw new BadRequestException('Can not refresh access token');
             }
 
             return $this;
 
-        }catch ( ClientException $e ){
-
-            if ( $e->getCode() === 400 )
-            {
-                $response = json_decode( $e->getResponse()->getBody() );
-                throw new RefreshTokenException($response->error_human_title ?? 'Can not refresh access token', $e->getCode(), null, $response->error ?? null, $response->error_description ?? null );
+        } catch (ClientException $e) {
+            if ($e->getCode() === 400) {
+                $response = \json_decode($e->getResponse()->getBody(), false);
+                throw new RefreshTokenException(
+                    $response->error_human_title ?? 'Can not refresh access token',
+                    $e->getCode(),
+                    null,
+                    $response->error ?? null,
+                    $response->error_description ?? null
+                );
             }
 
-            ExceptionFactory::throw( $e );
+            throw ExceptionFactory::createFromThrowable($e);
         }
-
     }
 
 }

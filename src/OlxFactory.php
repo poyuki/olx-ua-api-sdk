@@ -4,7 +4,12 @@ namespace Parhomenko\Olx;
 
 use Parhomenko\Olx\Exceptions\UnknownCountryException;
 
-class OlxFactory
+/**
+ * Class OlxFactory
+ *
+ * @package Parhomenko\Olx
+ */
+final class OlxFactory
 {
     public const UA = 'ua';
     public const PL = 'pl';
@@ -17,10 +22,10 @@ class OlxFactory
      * @param string $country_code
      * @param array $credentials
      * @param bool $update_token
-     * @return Api
+     * @return ApiInterface
      * @throws UnknownCountryException
      */
-    public static function create(string $country_code, array $credentials, bool $update_token = false): Api
+    public static function create(string $country_code, array $credentials, bool $update_token = false): ApiInterface
     {
         $links = [
             self::UA => 'https://www.olx.ua/',
@@ -32,7 +37,7 @@ class OlxFactory
         ];
 
         if (array_key_exists($country_code, $links)) {
-            return new Api($links[$country_code], $credentials, $update_token);
+            return new ApiInterface($links[$country_code], $credentials, $update_token);
         }
 
         throw new UnknownCountryException("Country does not supported");
