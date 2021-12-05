@@ -11,17 +11,9 @@ use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Psr7\Query;
 use GuzzleHttp\RequestOptions;
 use Parhomenko\Olx\Exceptions\BadRequestException;
-use Parhomenko\Olx\Exceptions\CallLimitException;
 use Parhomenko\Olx\Exceptions\ExceptionFactory;
-use Parhomenko\Olx\Exceptions\ForbiddenException;
-use Parhomenko\Olx\Exceptions\NotAcceptableException;
-use Parhomenko\Olx\Exceptions\NotFoundException;
 use Parhomenko\Olx\Exceptions\RefreshTokenException;
-use Parhomenko\Olx\Exceptions\ServerException;
-use Parhomenko\Olx\Exceptions\UnauthorizedException;
-use Parhomenko\Olx\Exceptions\UnsupportedMediaTypeException;
-use Parhomenko\Olx\Exceptions\ValidationException;
-use function GuzzleHttp\Psr7\build_query;
+use Throwable;
 use function json_decode;
 
 /**
@@ -173,6 +165,11 @@ class User
 
     /**
      * Check if token is invalid or unexpected
+     *
+     * @throws BadRequestException
+     * @throws GuzzleException
+     * @throws RefreshTokenException
+     * @throws Throwable
      */
     public function checkToken(): self
     {
@@ -220,10 +217,8 @@ class User
     /**
      * Step2. Get access token via code
      *
-     * @param string|null $code
-     * @param null $redirect_uri
-     * @return User
      * @throws GuzzleException
+     * @throws Exception
      */
     public function authorize(string $code = null, $redirect_uri = null): self
     {
@@ -267,18 +262,18 @@ class User
      * @throws BadRequestException
      * @throws GuzzleException
      * @throws RefreshTokenException
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function refreshToken(): self
     {
         try {
-
-            $response = $this->guzzleClient->request('POST', self::OLX_AUTH_REQUEST_URI, ['json' => [
-                'client_id' => $this->client_id,
-                'client_secret' => $this->client_secret,
-                'grant_type' => "refresh_token",
-                'refresh_token' => $this->refresh_token
-            ]
+            $response = $this->guzzleClient->request('POST', self::OLX_AUTH_REQUEST_URI, [
+                RequestOptions::JSON => [
+                    'client_id' => $this->client_id,
+                    'client_secret' => $this->client_secret,
+                    'grant_type' => "refresh_token",
+                    'refresh_token' => $this->refresh_token
+                ]
             ]);
 
             $data = json_decode($response->getBody()->getContents(), true);
@@ -294,10 +289,10 @@ class User
             }
 
             return $this;
-
         } catch (ClientException $e) {
             if ($e->getCode() === 400) {
-                $response = \json_decode($e->getResponse()->getBody(), false);
+                $response = json_decode($e->getResponse()->getBody(), false);
+
                 throw new RefreshTokenException(
                     $response->error_human_title ?? 'Can not refresh access token',
                     $e->getCode(),
@@ -310,5 +305,4 @@ class User
             throw ExceptionFactory::createFromThrowable($e);
         }
     }
-
 }
