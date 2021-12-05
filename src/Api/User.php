@@ -305,4 +305,12 @@ class User
             throw ExceptionFactory::createFromThrowable($e);
         }
     }
+
+    /**
+     * @return string
+     */
+    public function getTokenUpdatedAt(): string
+    {
+        return $this->token_updated_at;
+    }
 }
